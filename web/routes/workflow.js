@@ -12,6 +12,19 @@ const Workflow = require("../util/workflow");
 const Download = require("../util/download");
 const ImporterUtils = require("../util/importer");
 
+const phenotypes = require('./phenotypes.json')
+const OWNER = 'kclhi-clone'
+const REPO = 'phenoflow'
+
+let AUTH_TOKEN = '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'
+
+// Octokit.js
+// https://github.com/octokit/core.js#readme
+const { Octokit } = require("octokit");
+const octokit = new Octokit({
+  auth: AUTH_TOKEN
+})
+
 function processOffset(offsetParam) {
 
   try {
@@ -254,6 +267,47 @@ router.post("/generate/:workflowId", async function(req, res, next) {
     return res.sendStatus(500);
   }
 });
+
+router.post("/generate", async function(req, res, next) {
+
+  try {
+      const promises = phenotypes.map(async (phenotype) => {
+        await uploadPhenotype(phenotype);
+      });  
+  
+      await Promise.all(promises);
+      console.log('data', data)
+      response.status(200).send(data);
+    } catch(error) {
+      logger.debug("Error generating worflow: " + error);
+    return res.sendStatus(500);
+  }
+});
+
+async function uploadPhenotype(phenotype) {
+  const name = String(phenotype.name).toLowerCase()
+  
+  try {
+    await octokit.request('POST /orgs/{org}/repos', {
+      
+      org: OWNER,
+      name: name,
+      description: `This is the ${name} phenotype`,
+      'private': false,
+      has_issues: true,
+      has_projects: true,
+      has_wiki: true,
+      auto_init: true,
+      headers: {
+        'X-GitHub-Api-Version': '2022-11-28'
+      }
+    })
+
+    console.log(`Uploaded empty ${name} phenotype`)
+  } catch (error) {
+    console.log(error)
+  } 
+};
 
 async function createZenodoEntry(workflowId, language=null, implementationUnits=null, res) {
   let generatedWorkflow;
